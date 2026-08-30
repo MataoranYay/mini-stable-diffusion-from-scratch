@@ -1,0 +1,11 @@
+gradio==6.26.0
+ipython==8.12.3
+lpips==0.1.4
+matplotlib==3.11.1
+numpy==2.5.2
+Pillow==12.3.0
+safetensors==0.8.0
+torch==2.12.1
+torchvision==0.28.0
+tqdm==4.70.0
+transformers==5.12.1
