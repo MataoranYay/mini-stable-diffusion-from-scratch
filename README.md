@@ -1,6 +1,6 @@
 # Mini Stable Diffusion from Scratch
 
-一个基于 PyTorch 从零实现的 **Stable Diffusion v1.x** 教学/研究项目，包含完整的 VAE、CLIP 文本编码器、UNet 扩散模型、DDPM/DDIM 采样器，以及可交互的 Gradio WebUI。代码结构清晰、注释详尽，适合学习扩散模型原理或进行小规模微调实验。
+一个基于 PyTorch 从零实现的 **Stable Diffusion v1.x** 教学/研究项目，包含完整的 VAE、CLIP 文本编码器、UNet 扩散模型、DDPM/DDIM 采样器，以及可交互的 Gradio WebUI，适合学习扩散模型架构或进行小规模微调实验。
 
 > **声明**：本项目为教育性质实现，核心模块均从零手写，不依赖 `diffusers`、`stable-diffusion-webui` 等现成框架，便于理解 SD 的每个组件。
 
@@ -47,7 +47,7 @@
 - **两种交互方式**：
   - `train.ipynb`：Jupyter Notebook 训练与可视化调试。
   - `webui.py`：基于 Gradio 的图形化生成界面。
-- **权重加载灵活**：支持直接加载官方 `.safetensors` 权重，或加载自行训练的检查点。
+- **权重加载**：支持直接加载官方 `.safetensors` 权重，或加载自行训练的检查点。
 
 ---
 
@@ -68,7 +68,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # 3. 下载 SD v1.5 基础权重到 model/ 目录
-# 例如：model/base-v1-5-pruned-emaonly.safetensors
+# 如：model/base-v1-5-pruned-emaonly.safetensors
 
 # 4. 启动 WebUI
 python webui.py
@@ -125,10 +125,10 @@ mini-stable-diffusion/
 |------|---------|
 | 操作系统 | Windows 10/11 / Linux |
 | Python | 3.10 ~ 3.12 |
-| PyTorch | 2.12.1（支持 CUDA） |
-| CUDA | 12.x 或更高 |
+| PyTorch | 2.12.1 |
+| CUDA | 建议12.x 或更高 |
 | GPU 显存 | 训练 512×512 建议 ≥ 16 GB；推理 512×512 建议 ≥ 8 GB |
-| 训练显卡 | **NVIDIA GeForce RTX 5090**（本项目实际训练硬件） |
+| 训练显卡 | NVIDIA GeForce RTX 5090 |
 
 ---
 
@@ -193,7 +193,7 @@ dataset/your-dataset/
 
 也支持 `metadata.csv` 格式（`file_name,text`），或在没有标注文件时自动使用文件名作为 caption。
 
-示例数据集 `dataset/minecraft-preview/` 包含 1000 张 Minecraft 风格图像及对应英文描述。
+示例数据集 `https://huggingface.co/monadical-labs/minecraft-preview` 包含 1000 张 Minecraft 风格图像及对应英文描述。
 
 ---
 
