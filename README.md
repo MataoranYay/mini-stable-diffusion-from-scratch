@@ -171,17 +171,20 @@ transformers==5.12.1
 
 ### vae.py
 
+- 封装了 **变分自编码器 （Variational Auto-Encoder, VAE）**，对编码器类 `VAE_Encoder` 和解码器类`VAE_Decoder `独立封装，实例化或权重加载时二者分开进行。
 - 编码器将图像 `3×H×W` 压缩为 latent `4×(H/8)×(W/8)`。
 - 解码器将 latent 重建回图像。
 - 训练时使用重参数化技巧采样 latent，并通过 `scaling_factor`（默认 0.18215）缩放。
 
 ### clip.py
 
-- 使用本地 `tokenizer/` 下的 `vocab.json` 与 `merges.txt`。
+- 封装了 OpenAI 的 **对比语言-图像预训练模型 （Contrastive Language-Image Pretraining, CLIP）**中的 **文本编码器**，由于不考虑 CLIP 模型的训练，因此没有对图像编码器做额外封装。
+- 分词器配置放置在本地目录 `tokenizer/` 下的 `vocab.json` 与 `merges.txt`。
 - 文本编码为 `77` 个 token，输出 `77×768` 的文本嵌入，作为 UNet 的 cross-attention 条件。
 
 ### diffusion.py
 
+- 封装了 Stable Diffusion 的 **扩散模型 （Diffusion Model, UNet Model）**。
 - 时间步通过正弦位置编码（sinusoidal time embedding）映射为 `1×320`。
 - UNet 包含 Encoder、Bottleneck、Decoder，配合 Residual Block、Self-Attention、Cross-Attention 与 UpSample 层。
 - 输入为带噪 latent，输出为预测的噪声。
@@ -194,15 +197,97 @@ transformers==5.12.1
 
 ### 采样器
 
+- 在 `module/samplers/` 目录下，实现了 **DDPM** 采样器和 **DDIM** 采样器
 - **DDPM**：逐步去噪，每个时间步都注入随机噪声。
 - **DDIM**：确定性采样，可通过 `ddim_eta` 控制随机性。
 - 图生图时通过 `strength` 控制从哪一步开始去噪。
 
 ---
 
-## 数据集准备
+## 推理
 
-项目使用 **图像-文本对** 数据集。期望的目录结构如下：
+### 通过 Jupyter Notebook
+
+ `demo.ipynb`中展示了一个简易的图像生成 Pipline：
+
+```python
+import torch
+from transformers import CLIPTokenizer
+from PIL import Image
+from IPython.display import display, clear_output
+
+from module import model_loader, pipeline
+
+
+##### 1. 配置信息
+DEVICE = "cuda"
+DTYPE = torch.bfloat16
+MODEL_PATH = "model/v1-5-pruned-emaonly.safetensors"
+TOKENIZER_VOCAB = "tokenizer/vocab.json"
+TOKENIZER_MERGES = "tokenizer/merges.txt"
+
+##### 2. 加载模型与分词器
+tokenizer = CLIPTokenizer(TOKENIZER_VOCAB, TOKENIZER_MERGES)
+models = model_loader.get_models(MODEL_PATH, device=DEVICE, dtype=DTYPE)
+
+##### 3. 提示词与生成参数
+prompt = (
+    "airfish_(lefko_d), architecture, blue sky, blurry, boat, broken window, "
+    "building, city, day, depth of field, drum (container), no humans, outdoors, "
+    "ruins, scenery, science fiction, sign, signature, sky, water, watercraft"
+)
+gen_params = {
+    "prompt": prompt,
+    "uncond_prompt": "",
+    "img_width": 512,
+    "img_height": 512,
+    "input_image": None, # Image.open("image/image_0001.png").convert("RGB")
+    "strength": 0.6,
+    "do_cfg": True,
+    "cfg_scale": 7.5,
+    "sampler_name": "ddpm",
+    "n_inference_steps": 32,
+    "num_training_steps": 1000,
+    "models": models,
+    "seed": 31415926,
+    "device": DEVICE,
+    "dtype": DTYPE,
+    "tokenizer": tokenizer,
+    "ddim_eta": 0.1,
+    "decode_interval": 6,
+}
+
+##### 4. 生成并显示
+generator = pipeline.generate(**gen_params)
+
+for output_image in generator:
+    pil_img = Image.fromarray(output_image[0])
+    clear_output(wait=True)
+    display(pil_img)
+```
+
+### 通过 Gradio WebUI
+
+```bash
+python webui.py
+```
+
+浏览器将自动打开交互式界面，支持：
+
+- 正向 / 负向提示词
+- 图像分辨率设置
+- 随机种子控制
+- DDPM / DDIM 采样器选择
+- CFG 强度与推理步数
+- 图生图（上传参考图并设置 strength）
+
+---
+
+## 训练
+
+### 1. 数据集准备
+
+项目使用 **图像-文本对** 数据集（见 `trainer/dataset.py` ）。期望的目录结构如下：
 
 ```
 dataset/your-dataset/
@@ -217,27 +302,21 @@ dataset/your-dataset/
 
 ```json
 {
-    "00001.jpg": "a photo of a minecraft creeper",
-    "00002.png": "a male wearing 3D glasses",
+    "00001.jpg": "a photo of a minecraft creeper girl.",
+    "00002.png": "a male wearing 3D glasses.",
     "...": "..."
 }
 ```
 
-也支持 `metadata.csv` 格式（`file_name,text`），或在没有标注文件时自动使用文件名作为 caption。
-
 ---
 
-## 训练
-
-训练分为两个阶段：**VAE 自编码器** 与 **Diffusion UNet**。VAE 负责将图像压缩到 latent 空间，Diffusion 负责在 latent 空间中学习去噪，而 CLIP 直接使用 OpenAI 的预训练模型并冻结参数。
-
-### 1. Diffusion (UNet) 训练
+### 2. Diffusion (UNet) 训练
 
 大多数微调训练（如风格迁移、特定物体或人物概念学习、画风定制等）通常只需微调 Diffusion 模型（即 UNet）即可达到理想效果。训练时应冻结除 UNet 之外的所有权重（包括 VAE 与 CLIP Text Encoder），仅更新 UNet 参数。
 
 只有极少数例外情况才可能需要微调 VAE 的解码器，例如当训练数据中的细节、噪点或高频纹理被 VAE 在编码-解码过程中过度平滑或去除，导致重建图像丢失关键信息时（如医学影像中的微小病灶、遥感图像中的细小地物、需要保留胶片颗粒或特殊噪声风格的场景）。若确需微调 VAE，推荐流程为：先单独训练或微调 VAE（通常仅微调解码器部分），待 VAE 固定后再训练 Diffusion 模型，此时仍冻结 VAE 与文本编码器，仅训练 UNet。
 
-本项目使用 HuggingFace 上开源的 Danbooru 插画数据集 [Anime-Background-Finetuning-V1.1](https://huggingface.co/datasets/RicemanT/Anime-Background-Finetuning-V1.1) 中约 7,000 张图像，基于 Stable Diffusion v1.5 官方基础权重 `v1-5-pruned-emaonly.safetensors`，对 Diffusion 模型（UNet）进行了 30 个 epoch 的动漫风格化迁移微调。微调后的模型已在 ModelScope 平台开源 [Anime-Background-Finetuning-diffusion](https://www.modelscope.cn/models/MataoranYay/Anime-Background-Finetuning-diffusion/tree/master/checkpoint)。为避免重复的数据处理工作，处理后的训练数据集也一并上传至相同 ModelScope 仓库。
+本项目使用 HuggingFace 上开源的 Danbooru 插画数据集 [Anime-Background-Finetuning-V1.1](https://huggingface.co/datasets/RicemanT/Anime-Background-Finetuning-V1.1) 中约 7,000 张图像执行动漫风格化迁移任务，基于 Stable Diffusion v1.5 官方基础权重 `v1-5-pruned-emaonly.safetensors`，对 Diffusion 模型（UNet）进行了 30 个 epoch 的微调。微调后的模型已在 ModelScope 平台开源 [Anime-Background-Finetuning-diffusion](https://www.modelscope.cn/models/MataoranYay/Anime-Background-Finetuning-diffusion/tree/master/checkpoint)。为避免重复的数据处理工作，处理后的训练数据集也一并上传至该 ModelScope 仓库。
 
 下面展示了训练完成后的 `Anime-Background-Finetuning-diffusion` 模型生成的图像：
 
@@ -263,15 +342,14 @@ dataset/your-dataset/
 </table>
 
 
-
-Diffusion 模型训练的快速启动方案：
+**Diffusion 模型训练的快速启动方案**：
 
 ```python
 from trainer.train_diffusion import DiffusionTrainer
 
 diffusion_trainer = DiffusionTrainer(
     data_dir='dataset/Anime-Background-Finetuning-V1.1/',
-    output_dir='checkpoint/Anime-Background-Finetuning-V1.1',
+    output_dir='checkpoint/',
     vae_ckp='model/v1-5-pruned-emaonly.safetensors',
     clip_ckp='model/v1-5-pruned-emaonly.safetensors',
     diffusion_ckp='model/v1-5-pruned-emaonly.safetensors',
@@ -296,108 +374,57 @@ diffusion_trainer = DiffusionTrainer(
 diffusion_trainer.train()
 ```
 
-**训练目标**：
-
-```text
-L = || ε - ε_θ(x_t, t, c) ||²
-```
-
-其中 `x_t = √ᾱ_t · x_0 + √(1 - ᾱ_t) · ε`，`c` 为 CLIP 文本条件。通过最小化 MSE，使 UNet 学会根据文本提示预测并去除噪声。
-
 ---
 
-### 2. VAE 训练
+### 3. VAE 训练
+
+VAE 通常需要大规模图像数据进行预训练，直接从头训练并不现实，因此本部分仅对 VAE 的解码器进行简单微调，用于测试训练管线并观察其对特定风格数据的重建能力。
+
+实验使用 [minecraft-preview](https://huggingface.co/monadical-labs/minecraft-preview) 数据集中约 1,000 张 Minecraft 人物皮肤展示图，同时基于 Stable Diffusion v1.5 官方基础权重 `v1-5-pruned-emaonly.safetensors` 的 VAE 部分，对 VAE 解码器进行 2 个 epoch 的微调（冻结编码器参数），检查点已上传至 ModelScope 仓库 [vae_epoch_2.pt](https://www.modelscope.cn/models/MataoranYay/Anime-Background-Finetuning-diffusion/tree/master/checkpoint)。
+
+在该检查点上进行的潜空间插值实验为：从测试集中选取两张图像，分别提取其 latent 表示，并在潜空间中进行线性混合，再将混合结果输入微调后的解码器生成图像。结果如下：
+
+![](E:\Projects\Jypyter Notebook Projects\image\vae_0001.png)
+![](E:\Projects\Jypyter Notebook Projects\image\vae_0002.png)
+![](E:\Projects\Jypyter Notebook Projects\image\vae_0003.png)
+
+
+
+**VAE 模型训练的快速启动方案**：
+
 
 ```python
 from trainer.train_vae import VAETrainer
 
-trainer = VAETrainer(
-    data_dir='dataset/minecraft-preview/',
-    output_dir='checkpoint/',
-    from_pretrain='model/base-v1-5-pruned-emaonly.safetensors',
-    frozen_weights='encoder',      # 可冻结 encoder 只训练 decoder
-    image_size=512,
-    batch_size=4,
-    num_workers=16,
-    learning_rate=1e-4,
-    num_epochs=1,
-    lpips_weight=0.1,
-    kl_weight=1e-6,
-    scaling_factor=1.0,
-    save_every=1,
-    device='cuda',
-)
+vae_trainer = VAETrainer('dataset/minecraft-preview/', 
+                         output_dir="checkpoint/",
+                         from_pretrain = "model/v1-5-pruned-emaonly.safetensors",
+                         frozen_weights = "encoder",
+                         image_size = 512,
+                         batch_size = 4,
+                         num_workers = 16,
+                         learning_rate = 1e-4,
+                         num_epochs = 2,
+                         save_every = 2,
+                         lpips_weight = 0.1,
+                         kl_weight = 1e-6,
+                         scaling_factor=1.0,
+                         device="cuda")
 
-trainer.train()
+# 启动训练
+vae_trainer.train()
 ```
 
 **损失函数**：
 
-```text
-Loss = L1_recon + MSE_recon + λ_lpips * LPIPS + λ_kl * KL
-```
+$$
+Loss = L1_{recon} + MSE_{recon} + λ_{lpips} \cdot LPIPS + λ_{kl} \cdot KL
+$$
+
 
 - `L1_recon` / `MSE_recon`：像素级重建误差
-- `LPIPS`：感知损失（VGG 网络）
+- `LPIPS`：感知损失（利用 VGG 网络）
 - `KL`：latent 分布与标准正态分布的 KL 散度
-
-## 推理
-
-### 通过 Jupyter Notebook
-
-打开 `train.ipynb`，按顺序执行 **Diffusion Training → Eval** 单元格即可加载检查点并生成图像。
-
-```python
-from transformers import CLIPTokenizer
-from module import model_loader, pipeline
-
-DEVICE = 'cuda'
-DTYPE = torch.bfloat16
-
-tokenizer = CLIPTokenizer('tokenizer/vocab.json', 'tokenizer/merges.txt')
-models = {
-    'encoder':   model_loader.get_model('encoder',   'checkpoint/vae_epoch_1.pt', device=DEVICE, dtype=DTYPE).eval(),
-    'decoder':   model_loader.get_model('decoder',   'checkpoint/vae_epoch_1.pt', device=DEVICE, dtype=DTYPE).eval(),
-    'clip':      model_loader.get_model('clip',      'model/base-v1-5-pruned-emaonly.safetensors', device=DEVICE, dtype=DTYPE).eval(),
-    'diffusion': model_loader.get_model('diffusion', 'checkpoint/diffusion_epoch_2.pt', device=DEVICE, dtype=DTYPE).eval(),
-}
-
-generator = pipeline.generate(
-    prompt='A male wearing 3D glasses.',
-    uncond_prompt='',
-    img_width=512,
-    img_height=512,
-    do_cfg=True,
-    cfg_scale=8.5,
-    sampler_name='ddpm',
-    n_inference_steps=64,
-    num_training_steps=1000,
-    models=models,
-    seed=42,
-    device=DEVICE,
-    dtype=DTYPE,
-    tokenizer=tokenizer,
-    decode_interval=6,
-)
-
-for output_image in generator:
-    display(Image.fromarray(output_image[0]))
-```
-
-### 通过 Gradio WebUI
-
-```bash
-python webui.py
-```
-
-浏览器将自动打开交互式界面，支持：
-
-- 正向 / 负向提示词
-- 图像分辨率调节（64 的倍数）
-- DDPM / DDIM 采样器切换
-- CFG 强度与推理步数
-- 图生图（上传参考图并设置 strength）
-- 随机种子控制
 
 ---
 
