@@ -36,7 +36,7 @@ def model_list():
     if not os.path.exists(MODEL_PATH):
         return []
     return [f for f in os.listdir(MODEL_PATH) 
-            if os.path.isfile(os.path.join(MODEL_PATH, f)) and (f.endswith('.safetensors') or f.endswith('.pth'))]
+            if os.path.isfile(os.path.join(MODEL_PATH, f)) and (f.endswith('.safetensors'))]
 
 def avaliable_device():
     return "cuda" if torch.cuda.is_available() else 'cpu'
@@ -130,6 +130,7 @@ with gr.Blocks() as demo:
     with gr.Column():
         prompt = gr.Textbox(
             label="Positive prompts",
+            value="airfish_(lefko_d), architecture, blue sky, blurry, boat, broken window, building, city, day, depth of field, drum (container), no humans, outdoors, ruins, scenery, science fiction, sign, signature, sky, water, watercraft",
             placeholder="type prompts...",
             lines=2
         )
@@ -143,7 +144,7 @@ with gr.Blocks() as demo:
         with gr.Column():
             img_width = gr.Slider(
                 label="Width",
-                minimum=512,
+                minimum=128,
                 maximum=1024,
                 value=512,
                 step=64,
@@ -151,7 +152,7 @@ with gr.Blocks() as demo:
             )
             img_height = gr.Slider(
                 label="Height",
-                minimum=512,
+                minimum=128,
                 maximum=1024,
                 value=512,
                 step=64,
@@ -258,7 +259,7 @@ with gr.Blocks() as demo:
                     minimum=0,
                     maximum=1,
                     value=0.2,
-                    step=0.1,
+                    step=0.01,
                     info="Higher values add more noise and result in greater redrawing/regeneration."
             )
 
