@@ -384,9 +384,11 @@ VAE 通常需要大规模图像数据进行预训练，直接从头训练并不�
 
 在该检查点上进行的潜空间插值实验为：从测试集中选取两张图像，分别提取其 latent 表示，并在潜空间中进行线性混合，再将混合结果输入微调后的解码器生成图像。结果如下：
 
-![](E:\Projects\Jypyter Notebook Projects\image\vae_0001.png)
-![](E:\Projects\Jypyter Notebook Projects\image\vae_0002.png)
-![](E:\Projects\Jypyter Notebook Projects\image\vae_0003.png)
+![](.\image\vae_0001.png)
+
+![](.\image\vae_0002.png)
+
+![](.\image\vae_0003.png)
 
 
 
