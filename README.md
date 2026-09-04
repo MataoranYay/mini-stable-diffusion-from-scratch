@@ -15,23 +15,14 @@
   - [项目结构](#项目结构)
   - [环境要求](#环境要求)
   - [安装](#安装)
-  - [数据集准备](#数据集准备)
-  - [训练](#训练)
-    - [1. VAE 训练](#1-vae-训练)
-    - [2. Diffusion (UNet) 训练](#2-diffusion-unet-训练)
+  - [模型架构](#模型架构)
   - [推理](#推理)
     - [通过 Jupyter Notebook](#通过-jupyter-notebook)
     - [通过 Gradio WebUI](#通过-gradio-webui)
-  - [模型架构](#模型架构)
-    - [VAE](#vae)
-    - [CLIP](#clip)
-    - [UNet Diffusion](#unet-diffusion)
-    - [采样器](#采样器)
-  - [训练记录](#训练记录)
-    - [训练环境](#训练环境)
-    - [VAE 训练结果](#vae-训练结果)
-    - [Diffusion 训练结果](#diffusion-训练结果)
-  - [生成示例](#生成示例)
+  - [训练](#训练)
+    - [数据集准备](#数据集准备)
+    - [Diffusion (UNet) 训练](#diffusion-unet-训练)
+    - [VAE 训练](#vae-训练)
   - [注意事项与限制](#注意事项与限制)
   - [致谢](#致谢)
   - [许可证](#许可证)
@@ -265,7 +256,7 @@ python webui.py
 
 ## 训练
 
-### 1. 数据集准备
+### 数据集准备
 
 项目使用 **图像-文本对** 数据集（见 `trainer/dataset.py` ）。期望的目录结构如下：
 
@@ -295,7 +286,7 @@ dataset/your-dataset/
 
 ---
 
-### 2. Diffusion (UNet) 训练
+### Diffusion (UNet) 训练
 
 大多数微调训练（如风格迁移、特定物体或人物概念学习、画风定制等）通常只需微调 Diffusion 模型（即 UNet）即可达到理想效果。训练时应冻结除 UNet 之外的所有权重（包括 VAE 与 CLIP Text Encoder），仅更新 UNet 参数。
 
@@ -361,7 +352,7 @@ diffusion_trainer.train()
 
 ---
 
-### 3. VAE 训练
+### VAE 训练
 
 VAE 通常需要大规模图像数据进行预训练，直接从头训练并不现实，因此本部分仅对 VAE 的解码器部分进行简单微调（冻结编码器），用于测试训练管线并观察其对特定风格数据的重建能力。
 
