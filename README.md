@@ -281,8 +281,8 @@ dataset/your-dataset/
 
 从 ModelScope 仓库 [Anime-Background-Finetuning-diffusion](https://www.modelscope.cn/models/MataoranYay/Anime-Background-Finetuning-diffusion/tree/master/dataset) 下载本项目使用的经处理后的开源数据集，其中：
 
-* `Anime-Background-Finetuning-V1.1.rar` 数据集用于 Diffusion 风格化微调，原作者地址 [Anime-Background-Finetuning-V1.1](https://huggingface.co/datasets/RicemanT/Anime-Background-Finetuning-V1.1) 
-* `minecraft-preview.rar` 数据集用于 VAE 微调实验，原作者地址 [minecraft-preview](https://huggingface.co/monadical-labs/minecraft-preview)
+* `Anime-Background-Finetuning-V1.1.rar` 数据集用于 Diffusion 风格化微调。原数据集地址： [Anime-Background-Finetuning-V1.1](https://huggingface.co/datasets/RicemanT/Anime-Background-Finetuning-V1.1) 
+* `minecraft-preview.rar` 数据集用于 VAE 微调实验。原数据集地址： [minecraft-preview](https://huggingface.co/monadical-labs/minecraft-preview)
 
 ---
 
