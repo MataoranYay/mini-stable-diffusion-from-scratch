@@ -40,12 +40,13 @@
 
 ## 核心特性
 
+- **模型支持**：可支持大多数带有 VAE 的 **SD 1.0 / SD 1.5** 社区模型，`.safetensors`  权重文件放入 `model/` 目录下。
 - **从零实现核心组件**：VAE Encoder/Decoder、CLIP Text Encoder、UNet 扩散模型、Self/Cross Attention、Time Embedding。
 - **手动实现Pipline**：涵盖文本提示编码、时间步调度、无分类器引导（CFG）、扩散反向采样等关键环节，串联各核心组件完成端到端图像生成。
-- **权重加载**：在最小化架构改动、尽可能便于理解的原则下，仅对官方 `.safetensors` 权重键值对做简单变换，即可完成核心组件权重配对。
+- **权重加载**：在最小化架构改动、尽可能便于理解的原则下，仅简单变换官方权重键值对，即可完成核心组件权重配对。
 - **简易训练流程**：支持分阶段训练 VAE 与 Diffusion UNet，支持从 SD 官方权重加载预训练权重微调。
-- **多种采样器**：内置 DDPM 与 DDIM 采样器，支持文生图（text-to-image）与图生图（image-to-image）。
-- **两种交互方式**：
+- **采样器**：内置 DDPM 与 DDIM 采样器，支持文生图（text-to-image）与图生图（image-to-image）。
+- **交互方式**：
   - `train.ipynb`：Jupyter Notebook 训练与可视化调试。
   - `webui.py`：基于 Gradio 的图形化生成界面。
 
@@ -162,45 +163,24 @@ transformers==5.12.1
 ```
 
 3. 下载 Stable Diffusion v1.5 官方基础权重： [stable-diffusion-v1-5 · 模型库](https://www.modelscope.cn/models/AI-ModelScope/stable-diffusion-v1-5)（推荐`v1-5-pruned-emaonly.safetensors`，CLIP 分词器配置文件已在`tokenizer/`目录下）并放置到 `model/` 目录下，用于初始化 CLIP、VAE 与 Diffusion。
-3. （可选）下载本项目在开源数据集 [Anime-Background-Finetuning-V1.1](https://huggingface.co/datasets/RicemanT/Anime-Background-Finetuning-V1.1) 上微调的模型 [Anime-Background-Finetuning-diffusion](https://www.modelscope.cn/models/MataoranYay/Anime-Background-Finetuning-diffusion/tree/master/checkpoint) ，下载完成后同样放置在`model/` 目录下。
+3. （可选）下载本项目在开源数据集 [Anime-Background-Finetuning-V1.1](https://huggingface.co/datasets/RicemanT/Anime-Background-Finetuning-V1.1) 上微调的模型 [Anime-Background-Finetuning-diffusion](https://www.modelscope.cn/models/MataoranYay/Anime-Background-Finetuning-diffusion/tree/master/checkpoint) ，或其他任意 **SD 1.0/SD 1.5** 社区模型（需包含 VAE 权重），下载完成后同样放置在`model/` 目录下。
 
 ---
 
 
 ## 模型架构
 
-### vae.py
+* **vae.py**：封装了 **变分自编码器 （Variational Auto-Encoder, VAE）**，对编码器类 `VAE_Encoder` 和解码器类`VAE_Decoder `独立封装，实例化或权重加载时二者分开进行。
 
-- 封装了 **变分自编码器 （Variational Auto-Encoder, VAE）**，对编码器类 `VAE_Encoder` 和解码器类`VAE_Decoder `独立封装，实例化或权重加载时二者分开进行。
-- 编码器将图像 `3×H×W` 压缩为 latent `4×(H/8)×(W/8)`。
-- 解码器将 latent 重建回图像。
-- 训练时使用重参数化技巧采样 latent，并通过 `scaling_factor`（默认 0.18215）缩放。
+* **clip.py**：封装了 OpenAI 的 **对比语言-图像预训练模型 （Contrastive Language-Image Pretraining, CLIP）**中的 **文本编码器**，由于不考虑 CLIP 模型的训练，因此没有对图像编码器做额外封装。
 
-### clip.py
+* **diffusion.py**：封装了 Stable Diffusion 的 **扩散模型 （Diffusion Model, UNet Model）**。
 
-- 封装了 OpenAI 的 **对比语言-图像预训练模型 （Contrastive Language-Image Pretraining, CLIP）**中的 **文本编码器**，由于不考虑 CLIP 模型的训练，因此没有对图像编码器做额外封装。
-- 分词器配置放置在本地目录 `tokenizer/` 下的 `vocab.json` 与 `merges.txt`。
-- 文本编码为 `77` 个 token，输出 `77×768` 的文本嵌入，作为 UNet 的 cross-attention 条件。
 
-### diffusion.py
+* **采样器**：在 `module/samplers/` 目录下，封装了 **DDPM** 采样器和 **DDIM** 采样器。
+* **pipeline.py**：手动串联各个模块，执行完整的端到端图像生成任务。
+* **model_loader.py**：执行简易键值对变换，以适配官方/社区 SD1/SD1.5 模型。
 
-- 封装了 Stable Diffusion 的 **扩散模型 （Diffusion Model, UNet Model）**。
-- 时间步通过正弦位置编码（sinusoidal time embedding）映射为 `1×320`。
-- UNet 包含 Encoder、Bottleneck、Decoder，配合 Residual Block、Self-Attention、Cross-Attention 与 UpSample 层。
-- 输入为带噪 latent，输出为预测的噪声。
-
-### pipeline.py
-
-- 时间步通过正弦位置编码（sinusoidal time embedding）映射为 `1×320`。
-- UNet 包含 Encoder、Bottleneck、Decoder，配合 Residual Block、Self-Attention、Cross-Attention 与 UpSample 层。
-- 输入为带噪 latent，输出为预测的噪声。
-
-### 采样器
-
-- 在 `module/samplers/` 目录下，实现了 **DDPM** 采样器和 **DDIM** 采样器
-- **DDPM**：逐步去噪，每个时间步都注入随机噪声。
-- **DDIM**：确定性采样，可通过 `ddim_eta` 控制随机性。
-- 图生图时通过 `strength` 控制从哪一步开始去噪。
 
 ---
 
@@ -308,6 +288,11 @@ dataset/your-dataset/
 }
 ```
 
+从 ModelScope 仓库 [Anime-Background-Finetuning-diffusion](https://www.modelscope.cn/models/MataoranYay/Anime-Background-Finetuning-diffusion/tree/master/dataset) 下载本项目使用的经处理后的开源数据集，其中：
+
+* `Anime-Background-Finetuning-V1.1.rar` 数据集用于 Diffusion 风格化微调，原作者地址 [Anime-Background-Finetuning-V1.1](https://huggingface.co/datasets/RicemanT/Anime-Background-Finetuning-V1.1) 
+* `minecraft-preview.rar` 数据集用于 VAE 微调实验，原作者地址 [minecraft-preview](https://huggingface.co/monadical-labs/minecraft-preview)
+
 ---
 
 ### 2. Diffusion (UNet) 训练
@@ -318,7 +303,7 @@ dataset/your-dataset/
 
 本项目使用 HuggingFace 上开源的 Danbooru 插画数据集 [Anime-Background-Finetuning-V1.1](https://huggingface.co/datasets/RicemanT/Anime-Background-Finetuning-V1.1) 中约 7,000 张图像执行动漫风格化迁移任务，基于 Stable Diffusion v1.5 官方基础权重 `v1-5-pruned-emaonly.safetensors`，对 Diffusion 模型（UNet）进行了 30 个 epoch 的微调。微调后的模型已在 ModelScope 平台开源 [Anime-Background-Finetuning-diffusion](https://www.modelscope.cn/models/MataoranYay/Anime-Background-Finetuning-diffusion/tree/master/checkpoint)。为避免重复的数据处理工作，处理后的训练数据集也一并上传至该 ModelScope 仓库。
 
-下面展示了训练完成后的 `Anime-Background-Finetuning-diffusion` 模型生成的图像：
+下面展示了训练完成后的 `Anime-Background-Finetuning-diffusion.safetensors` 模型生成的图像：
 
 <table>
   <tr>
@@ -378,7 +363,7 @@ diffusion_trainer.train()
 
 ### 3. VAE 训练
 
-VAE 通常需要大规模图像数据进行预训练，直接从头训练并不现实，因此本部分仅对 VAE 的解码器进行简单微调，用于测试训练管线并观察其对特定风格数据的重建能力。
+VAE 通常需要大规模图像数据进行预训练，直接从头训练并不现实，因此本部分仅对 VAE 的解码器部分进行简单微调（冻结编码器），用于测试训练管线并观察其对特定风格数据的重建能力。
 
 实验使用 [minecraft-preview](https://huggingface.co/monadical-labs/minecraft-preview) 数据集中约 1,000 张 Minecraft 人物皮肤展示图，同时基于 Stable Diffusion v1.5 官方基础权重 `v1-5-pruned-emaonly.safetensors` 的 VAE 部分，对 VAE 解码器进行 2 个 epoch 的微调（冻结编码器参数），检查点已上传至 ModelScope 仓库 [vae_epoch_2.pt](https://www.modelscope.cn/models/MataoranYay/Anime-Background-Finetuning-diffusion/tree/master/checkpoint)。
 
@@ -415,8 +400,7 @@ vae_trainer = VAETrainer('dataset/minecraft-preview/',
 vae_trainer.train()
 ```
 
-**损失函数**：
-
+**VAE 训练使用的损失函数**：
 $$
 Loss = L1_{recon} + MSE_{recon} + λ_{lpips} \cdot LPIPS + λ_{kl} \cdot KL
 $$
