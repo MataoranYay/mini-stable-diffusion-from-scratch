@@ -154,7 +154,7 @@ transformers==5.12.1
 ```
 
 3. 下载 Stable Diffusion v1.5 官方基础权重： [stable-diffusion-v1-5 · 模型库](https://www.modelscope.cn/models/AI-ModelScope/stable-diffusion-v1-5)（推荐`v1-5-pruned-emaonly.safetensors`，CLIP 分词器配置文件已在`tokenizer/`目录下）并放置到 `model/` 目录下，用于初始化 CLIP、VAE 与 Diffusion。
-3. （可选）下载本项目在开源数据集 [Anime-Background-Finetuning-V1.1](https://huggingface.co/datasets/RicemanT/Anime-Background-Finetuning-V1.1) 上微调的模型 [Anime-Background-Finetuning-diffusion](https://www.modelscope.cn/models/MataoranYay/Anime-Background-Finetuning-diffusion/tree/master/checkpoint) ，或其他任意 **SD 1.0/SD 1.5** 社区模型（需包含 VAE 权重），下载完成后同样放置在`model/` 目录下。
+3. （可选）下载本项目在开源数据集 [Anime-Background-Finetuning-V1.1](https://huggingface.co/datasets/RicemanT/Anime-Background-Finetuning-V1.1) 上微调的模型 [Anime-Background-Finetuning-diffusion](https://www.modelscope.cn/models/MataoranYay/Anime-Background-Finetuning-diffusion) ，或其他任意 **SD 1.0/SD 1.5** 社区模型（需包含 VAE 权重），下载完成后同样放置在`model/` 目录下。
 
 ---
 
@@ -292,7 +292,7 @@ dataset/your-dataset/
 
 只有极少数例外情况才可能需要微调 VAE 的解码器，例如当训练数据中的细节、噪点或高频纹理被 VAE 在编码-解码过程中过度平滑或去除，导致重建图像丢失关键信息时（如医学影像中的微小病灶、遥感图像中的细小地物、需要保留胶片颗粒或特殊噪声风格的场景）。若确需微调 VAE，推荐流程为：先单独训练或微调 VAE（通常仅微调解码器部分），待 VAE 固定后再训练 Diffusion 模型，此时仍冻结 VAE 与文本编码器，仅训练 UNet。
 
-本项目使用 HuggingFace 上开源的 Danbooru 插画数据集 [Anime-Background-Finetuning-V1.1](https://huggingface.co/datasets/RicemanT/Anime-Background-Finetuning-V1.1) 中约 7,000 张图像执行动漫风格化迁移任务，基于 Stable Diffusion v1.5 官方基础权重 `v1-5-pruned-emaonly.safetensors`，对 Diffusion 模型（UNet）进行了 30 个 epoch 的微调。微调后的模型已在 ModelScope 平台开源 [Anime-Background-Finetuning-diffusion](https://www.modelscope.cn/models/MataoranYay/Anime-Background-Finetuning-diffusion/tree/master/checkpoint)。为避免重复的数据处理工作，处理后的训练数据集也一并上传至该 ModelScope 仓库。
+本项目使用 HuggingFace 上开源的 Danbooru 插画数据集 [Anime-Background-Finetuning-V1.1](https://huggingface.co/datasets/RicemanT/Anime-Background-Finetuning-V1.1) 中约 7,000 张图像执行动漫风格化迁移任务，基于 Stable Diffusion v1.5 官方基础权重 `v1-5-pruned-emaonly.safetensors`，对 Diffusion 模型（UNet）进行了 30 个 epoch 的微调。微调后的模型已在 ModelScope 平台开源 [Anime-Background-Finetuning-diffusion](https://www.modelscope.cn/models/MataoranYay/Anime-Background-Finetuning-diffusion)。为避免重复的数据处理工作，处理后的训练数据集也一并上传至该 ModelScope 仓库。
 
 下面展示了训练完成后的 `Anime-Background-Finetuning-diffusion.safetensors` 模型生成的图像：
 
